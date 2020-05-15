@@ -12,4 +12,5 @@ pip3 install sklearn
 pip3 install unittest
 pip3 install scipy
 pip3 install sklearn
+pip3 install networkx
 ```
