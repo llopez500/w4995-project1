@@ -1,5 +1,6 @@
 
 from __future__ import print_function
+from nearest_neighbor import NearestNeighbor
 from sklearn.datasets import load_iris
 import numpy as np
 import falconn
@@ -7,8 +8,80 @@ import timeit
 import math
 
 #MAKE THIS A FUNCTION!!!
+class LSH(NearestNeighbor):
+    def __init__(self, dataset):
+
+        number_of_queries = 10
+        # we build only 50 tables, increasing this quantity will improve the query time
+        # at a cost of slower preprocessing and larger memory footprint, feel free to
+        # play with this number
+        number_of_tables = 50
+
+        params_cp = falconn.LSHConstructionParameters()
+
+        params_cp.dimension = len(dataset[0])
+        params_cp.lsh_family = falconn.LSHFamily.CrossPolytope
+        params_cp.distance_function = falconn.DistanceFunction.EuclideanSquared
+        params_cp.l = number_of_tables
+        # we set one rotation, since the data is dense enough,
+        # for sparse data set it to 2
+        params_cp.num_rotations = 1
+        params_cp.seed = 5721840
+        # we want to use all the available threads to set up
+        params_cp.num_setup_threads = 0
+        params_cp.storage_hash_table = falconn.StorageHashTable.BitPackedFlatHashTable
+        self.params_cp = params_cp
+
+        # we build 18-bit hashes so that each table has
+        # 2^18 bins; this is a good choise since 2^18 is of the same
+        # order of magnitude as the number of data points
+        falconn.compute_number_of_hash_functions(18, params_cp)
+
+        print('Constructing the LSH table')
+        self.table = falconn.LSHIndex(params_cp)
+        self.table.setup(dataset)
+        self.data = dataset
+        self.query_object = self.table.construct_query_object()
+
+
+
+        #super().__init__(data)
+
+        #self.output_dim = output_dim
+        #self.randproj = GaussianRandomProjection(n_components=output_dim)
+        #self.new_data = self.randproj.fit_transform(self.data)
+
+
+    def add_to_data(self, point):
+        """Return None
+
+        Add a new point to the dataset
+        """
+        falconn.compute_number_of_hash_functions(18, self.params_cp)
+
+        print('Constructing the LSH table')
+        self.table = falconn.LSHIndex(self.params_cp )
+        self.data = np.vstack([self.data, point])
+        self.table.setup(self.data)
+
+
+    def find_nn(self, query):
+        """Return (index, np.array)
+
+        Query closest neighbor in the dataset
+        """
+        return self.query_object.find_nearest_neighbor(query)
+
 if __name__ == '__main__':
-    number_of_queries = 10
+    data = load_iris()['data']
+    lsh = LSH(data)
+    point = np.array([4.7,3.2,1.3,0.3])
+    lsh.add_to_data(point)
+    neighbors = lsh.find_nn(point)
+    print(neighbors)
+
+
+    """number_of_queries = 10
     # we build only 50 tables, increasing this quantity will improve the query time
     # at a cost of slower preprocessing and larger memory footprint, feel free to
     # play with this number
@@ -130,4 +203,4 @@ if __name__ == '__main__':
     t2 = timeit.default_timer()
 
     print('Query time: {}'.format((t2 - t1) / len(queries)))
-    print('Precision: {}'.format(float(score) / len(queries)))
+    print('Precision: {}'.format(float(score) / len(queries)))"""
